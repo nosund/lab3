@@ -6,7 +6,8 @@
 -record(client_st, {
     gui, % atom of the GUI process
     nick, % nick/username of the client
-    server % atom of the chat server
+    server, % atom of the chat server
+    channels
 }).
 
 % Return an initial state record. This is called from GUI.
@@ -15,7 +16,8 @@ initial_state(Nick, GUIAtom, ServerAtom) ->
     #client_st{
         gui = GUIAtom,
         nick = Nick,
-        server = ServerAtom
+        server = ServerAtom,
+        channels = []
     }.
 
 % handle/2 handles each kind of request from GUI
@@ -28,15 +30,27 @@ initial_state(Nick, GUIAtom, ServerAtom) ->
 
 % Join channel
 handle(St, {join, Channel}) ->
+    case lists:member(St#client_st.server, registered()) of
+        true -> res = gen_server:request(St#client_st.server,{join,Channel,self()}),
+        case res of
+            joined -> {reply, ok, St#client_st.channel = [Channel|St#client_st.channel]},
+            failed -> 
+        end;
+        false -> {reply, {failed, user_already_joined, "user already in server"}, St}
+    end;
     % TODO: Implement this function
     % {reply, ok, St} ;
-    {reply, {error, not_implemented, "join not implemented"}, St} ;
+
 
 % Leave channel
 handle(St, {leave, Channel}) ->
     % TODO: Implement this function
+    case lists:member(Channel,St#client_st.channels) of
+        true -> gen_server:request(list_to_atom,{leave, self(),Channel}),
+        false -> {reply, {failed, user_already_left, "user not in channel"}}
+    end;
     % {reply, ok, St} ;
-    {reply, {error, not_implemented, "leave not implemented"}, St} ;
+    % {reply, {error, not_implemented, "leave not implemented"}, St} ;
 
 % Sending message (from GUI, to channel)
 handle(St, {message_send, Channel, Msg}) ->
